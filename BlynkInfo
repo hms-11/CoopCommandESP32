@@ -1,0 +1,10 @@
+# To connect to CoopCommand with your smartphone, you will need to follow these steps:
+1) Go to https://blynk.io/ and make a free account.
+2) Once you have signed up and are at the Blynk Dashboard, go to "Templates" on the left hand side of the screen. 
+3) Create a new Template and name it CoopCommand or something similar. 
+4) Create the following Datastreams as shown at this imgur link: https://imgur.com/a/NWCejiL
+5) Add the Template ID and Device name in the appropriate place in the CoopCommand program (IDE will throw an error if not done and will not upload)
+6) Download the Blynk App (Blynk IOT for Android, unsure for Apple).
+7) Top right of the app once you are logged in is 3 bars, click on that and then click "add new device" while you are near your CoopCommand board and it is powered up.
+8) Follow the directions in the app to connect your phone to your CoopCommand.
+9) Congratulations! You are now online with CoopCommand!
