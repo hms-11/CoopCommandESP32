@@ -66,6 +66,7 @@ All files are included in this git-repository to get CoopCommand up and running.
 
 Once you have the board in hand and assembled, program can be easily loaded in using the Arduino IDE (or your preffered IDE) and a USB cable.
 First, follow the instructions in the "BlynkInfo" file. This will setup the needed steps to get the app going and generate a required Template ID and Device Name to be added to your program to be uploaded to the board.
+
 Secondly, download all files using the "Download Zip" button. Extract all files in the CoopCommand folder into a folder all together. If you open the .ino file using Arduino IDE all other files will be loaded at same time. Insert the Template ID and Device Name into the appropriate location at the top of the sketch.  Select your board (ESP32 Dev Module), select your Com Port and upload!
 
  
