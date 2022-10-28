@@ -1,0 +1,445 @@
+//                        COOP COMMAND ESP32 (Full Function Field Test Ready)
+//
+//
+//                                      Component/Feature Notes:
+//                          -- Photo Resistor GL5539 W/10K Divider
+//                          -- Interior Temp/Humidity Sensor DHT22
+//                          -- Water Temp Sensor DS18B20
+//                          -- WIFI Monitored and Controlled via Blynk App
+//                          -- Designed to be used with TacoChicken Control Boards (V1.0)
+
+
+
+// Fill-in information from your Blynk Template here
+#define BLYNK_TEMPLATE_ID "TMPL-flCABCq"
+#define BLYNK_DEVICE_NAME "CoopCommand"
+ 
+#define BLYNK_FIRMWARE_VERSION        "0.4.1"
+ 
+#define BLYNK_PRINT Serial
+//#define BLYNK_DEBUG
+ 
+#define APP_DEBUG
+ 
+// Uncomment your board, or configure a custom board in Settings.h
+//#define USE_WROVER_BOARD
+//#define USE_TTGO_T7
+ 
+
+// Libraries
+#include "BlynkEdgent.h"
+#include <DallasTemperature.h>
+#include <OneWire.h>
+#include <DHT.h>
+ 
+// Blynk Widget Setups
+ 
+WidgetLED led1(V1);
+WidgetLED led2(V2);
+WidgetLED led3(V3);
+WidgetLED led4(V4);
+WidgetLED led5(V14);
+ 
+// Blynk Timer
+
+BlynkTimer timer; 
+ 
+// DS18B20 Sensor Setup
+ 
+#define ONE_WIRE_BUS 25                 // Pin for One-Wire Bus
+OneWire oneWire(ONE_WIRE_BUS);          // Initialize One-Wire Bus
+DallasTemperature sensors(&oneWire);    // Initialize DS18B20
+ 
+//DHT Setup
+
+#define DHTPIN 32             // Pin for DHT sensor
+#define DHTTYPE DHT22         // DHT 22  (AM2302)
+DHT dht(DHTPIN, DHTTYPE);     // Initialize DHT sensor
+ 
+// Photocell Pin
+
+const int photocellPin                 = 34;  // analog pin for photocell
+
+// Door Limit Switches
+
+const int bottomSwitchPin              = 26;  // bottom switch is connected to pin 26
+const int topSwitchPin                 = 27;  // top switch is connected to pin 27
+
+//Door Motor Driver Pins
+
+const int directionCloseCoopDoorMotorB = 19;  // direction close motor b - pin 19
+const int directionOpenCoopDoorMotorB  = 21;  // direction open motor b - pin 21
+
+// OutPuts
+const int layLightRelay                = 4;   // output pin controlling lay light MOSFET
+const int fanRelay                     = 16;  // output pin controlling ventilation fan MOSFET
+const int heatRelay                    = 17;  // output pin controlling water heater MOSFET
+const int output3                      = 18;  // Spare Output MOSFET
+
+ 
+// Sensor Variables
+bool doorOpen          = false;          // is the coop door open
+bool doorClosed        = false;          // is the door closed
+bool doorOpenMove      = false;          // is the door opening?
+bool doorCloseMove     = false;          // is the door closing?
+int topSwitchState;                      // Current state (open/closed) of the top limit switch
+int bottomSwitchState;                   // Current state (open/closed) of the bottom limit switch
+bool doorSensor        = true;           // is the door in automatic or manual mode
+bool heaterOn          = true;           // is the water heater function running
+bool nightTimer        = false;          // is it night time
+bool layLightOn        = true;           // is the Lay Light time monitoring system on
+bool nightLightOn      = false;          // is the Night Light on
+int coopTemp           = 0;              // Interior Coop Temperature Reading
+int closeDoor          = 5;              // Light level to close coop door (user editable)
+int openDoor           = closeDoor + 20; // Light level to open coop door
+int hotTemp            = 30;             // Temperature to turn on Ventilation Fan Relay (user editable)
+int coldTemp           = 3;              // Temperature to turn on Water Heat MOSFET (user editable)
+float waterTemp        = 0;              // Water Tempterature Reading
+float hum;                               // Stores humidity value from DHT22
+float temp;                              // Stores temperature value from DHT22
+int photocellReading;                    // analog reading of the photocell
+int photocellReadingLevel = '2';         // photocell reading levels (night, light, twilight)
+ 
+// Timer Variables
+unsigned long layLightTimer            = 36000000; // Timer to make sure at least 14 hours of "daylight"
+unsigned long lastDayLightReadingTime  = 0;        // timer to keep track of how long it has been night
+unsigned long nightLightDelay          = 300000;   // 5 minute timer to turn on the coop light if light switch button is pushed and it is night.
+unsigned long lastNightLightTime       = 0;        // the last time the night light button was pushed
+ 
+void setup()
+{
+  Serial.begin(115200); // Start Serial Comms
+  delay(100);
+  dht.begin(); // Start DHT sensor
+  sensors.begin(); // Start DS18B20 Sensor
+  BlynkEdgent.begin(); // Start Edgent
+  
+  // Set Pin Modes
+  pinMode(photocellPin, INPUT);
+  pinMode(topSwitchPin, INPUT);
+  pinMode(bottomSwitchPin, INPUT);
+  pinMode(layLightRelay, OUTPUT);
+  pinMode(fanRelay, OUTPUT);
+  pinMode(heatRelay, OUTPUT);
+  pinMode(directionCloseCoopDoorMotorB, OUTPUT);
+  pinMode(directionOpenCoopDoorMotorB, OUTPUT);
+  
+  // Initial Photocell reading
+  photocellReading = analogRead(photocellPin);
+  photocellReading = map(photocellReading, 0, 4000, 0, 100); // Map reading to 0-100
+
+  // Ensure Mosfets are pulled low
+  digitalWrite(layLightRelay, LOW);
+  digitalWrite(fanRelay, LOW);
+  digitalWrite(heatRelay, LOW);
+  digitalWrite(output3, LOW);
+  readSwitches();
+
+  // Set Timers
+  timer.setInterval(2000,readSensor);
+  timer.setInterval(600000,doorControl);
+  timer.setInterval(1000,ventFan);
+  timer.setInterval(1000,waterHeat);
+  timer.setInterval(1000,layLight);
+}
+ 
+// Function to Control Coop Light
+void layLight() {
+  if (layLightOn) {
+    if (!nightTimer) { // if it is not dark
+      lastDayLightReadingTime = millis();
+      digitalWrite(layLightRelay, LOW); // turn off the lay light
+      Blynk.virtualWrite(V14, LOW); // Turn off Blynk Widge LED
+      } 
+    else { // if it is dark
+      if ((unsigned long)(millis() - lastDayLightReadingTime) >= layLightTimer) { //if it has been dark more than 14 hours (or whatever the timer is
+        digitalWrite(layLightRelay, HIGH); // turn on the lay light
+        Blynk.virtualWrite(V14, HIGH); // turn on Blynk Widget LED
+      }
+    }
+  }
+ 
+  if (nightLightOn) { // if someone wants the light on
+    digitalWrite(layLightRelay, HIGH); // Turn on the light
+    Blynk.virtualWrite(V14, HIGH); // Turn on Blynk Widge LED
+    // Set Timeout to shut light off after 5 minutes
+    timer.setTimeout(300000, []() 
+    {
+      digitalWrite(layLightRelay, LOW);
+      Blynk.virtualWrite(V14, LOW);
+      nightLightOn = false;
+    });
+  } 
+}
+ 
+// Function to read sensors as well as send data to Blynk
+void readSensor()
+{
+  // Send Light Value to Blynk
+  Blynk.virtualWrite(V8, photocellReading);
+  // Read DS18B20 Water Temp Sensor
+  sensors.requestTemperatures(); 
+  waterTemp = sensors.getTempCByIndex(0);
+  // If Reading is -127 sensor is faulty or not connected, default to 0 value and turn off water heat ability
+  if (waterTemp == -127) {
+    waterTemp = 0;
+    heaterOn = false;
+  }
+  // If the sensor reads literally any other value, sensor is working, heater is enabled
+  else {
+    heaterOn = true;
+  }
+  // Send Water Temp to Blynk
+  Blynk.virtualWrite(V5, waterTemp);
+  //Read DHT22
+  hum = dht.readHumidity();
+  temp = dht.readTemperature(); 
+  // Send DHT22 Values to Blynk
+  Blynk.virtualWrite(V13, hum);
+  Blynk.virtualWrite(V0, temp);
+  // Send control settings to Blynk
+  Blynk.virtualWrite(V20, hotTemp);
+  Blynk.virtualWrite(V21, coldTemp);
+  Blynk.virtualWrite(V22, closeDoor);
+ 
+ 
+  // Blynk Widget LED control based on Coop Door Status
+  if (doorOpen) {
+    Blynk.virtualWrite(V1, HIGH);
+  }
+  else {
+    Blynk.virtualWrite(V1, LOW);
+  }
+  if (doorClosed) {
+    Blynk.virtualWrite(V2, HIGH);
+  }
+  else {
+    Blynk.virtualWrite(V2, LOW);
+  }
+  if (doorOpenMove) {
+    Blynk.virtualWrite(V3, HIGH);
+  }
+  else {
+    Blynk.virtualWrite(V3, LOW);
+  }
+  if (doorCloseMove) {
+    Blynk.virtualWrite(V4, HIGH);
+  }
+  else {
+    Blynk.virtualWrite(V4, LOW);
+  }
+}
+ 
+// Function to read photocell and send commands to door function at proper intervals
+void doorControl()
+{
+  photocellReading = analogRead(photocellPin); // Read the photocell
+  photocellReading = map(photocellReading, 0, 4000, 0, 100); // Map photocell readings to 0-100 value
+  if (photocellReading >= 0 && photocellReading <= closeDoor) { // Night Setting based on user or default selected low light trigger
+    // If it is "night" set 20 minute timer before door closes to make sure chickens are all inside
+    if (doorSensor) {
+    timer.setTimeout(1200000, []()
+    {
+      photocellReadingLevel = '1';
+    });
+    }
+    nightTimer = true; // Tell system to enable LayLight timer monitoring
+  } 
+  else if (photocellReading  >= closeDoor && photocellReading <= openDoor) { // Twighlight setting
+    if (doorSensor) {
+      photocellReadingLevel = '2';
+    }
+  } 
+  else if (photocellReading  >= openDoor) { //Daylight Setting
+    // If "daytime", set coop door control to open
+    if (doorSensor) {
+      photocellReadingLevel = '3';
+    }
+  }
+  else if (photocellReading >= closeDoor) {
+    // Turn off night timer and Lay Light once it is not pitch black
+    nightTimer = false;
+  }
+}
+ 
+// Function to control water heater
+void waterHeat()
+{
+  if (heaterOn) {
+      //If sensor fails or becomes disconnected, turn off the heater and zero the sensor
+      if (waterTemp == -127) {
+        digitalWrite(heatRelay, LOW); // Turn off the water heater
+        Blynk.virtualWrite(V15, LOW);
+        waterTemp = 0;
+        heaterOn = false;
+      }
+      else if (waterTemp >= (coldTemp + 3)) { // If the temperature is 3 degrees above the trigger temp
+        digitalWrite(heatRelay, LOW); // Turn off the water heater
+        Blynk.virtualWrite(V15, LOW); // Turn off the Blynk LED
+      }
+      else if (waterTemp < coldTemp) { // If the temperature is below the cold temperature
+        digitalWrite(heatRelay, HIGH); // Turn on the water heater
+        Blynk.virtualWrite(V15, HIGH); // Turn on the Blynk LED
+      }
+  }
+  else {
+    digitalWrite(heatRelay, LOW); // Turn off the water heater
+    Blynk.virtualWrite(V15, LOW); // Turn off the Blynk LED
+  }
+
+}
+ 
+// Function to control ventilation fan
+void ventFan()
+{
+  if (coopTemp >= hotTemp) { // If the temperature is above the Hot temperature
+      digitalWrite(fanRelay, HIGH); // Turn on the ventilation fan
+      Blynk.virtualWrite(V16, HIGH); // Turn on the Blynk LED
+    }
+  else if (coopTemp < (hotTemp - 2)) { // If the temperature has been lowered two degrees
+      digitalWrite(fanRelay, LOW); // Turn off the ventilation fan
+      Blynk.virtualWrite(V16, LOW); // Turn off the Blynk LED
+    }
+}
+ 
+// Function to check limit switches
+void readSwitches() {
+  topSwitchState = (digitalRead(topSwitchPin)); // Check the state of the top limit switch
+  if (topSwitchState == 0) {
+    doorOpen = true;      
+  }
+  bottomSwitchState = (digitalRead(bottomSwitchPin)); // Check the state of the bottom limit switch
+  if (bottomSwitchState == 0) {
+    doorClosed = true;      
+  }
+}
+ 
+// stop the coop door motor and put the motor driver IC to sleep (power saving)
+void stopCoopDoorMotorB() {
+  digitalWrite (directionCloseCoopDoorMotorB, LOW);      // turn off motor close direction
+  digitalWrite (directionOpenCoopDoorMotorB, LOW);       // turn off motor open direction
+}
+ 
+// close the coop door motor
+void closeCoopDoorMotorB() {
+  if (bottomSwitchState == 1) {                         //if the bottom reed switch is open
+    digitalWrite (directionCloseCoopDoorMotorB, HIGH);     // turn on motor close direction
+    digitalWrite (directionOpenCoopDoorMotorB, LOW);       // turn off motor open direction
+    doorOpen = false;      
+    doorClosed = false;
+    doorCloseMove = true;
+    doorOpenMove = false;        
+  }
+  else {                     // if bottom reed switch circuit is closed
+    stopCoopDoorMotorB();
+    doorClosed = true;
+    doorCloseMove = false;
+    doorOpenMove = false;
+  }
+}
+ 
+// open the coop door
+void openCoopDoorMotorB() {
+  if (topSwitchState == 1) {                         //if the top reed switch is open
+    digitalWrite(directionCloseCoopDoorMotorB, LOW);       // turn off motor close direction
+    digitalWrite(directionOpenCoopDoorMotorB, HIGH);       // turn on motor open direction
+    doorOpen = false;      
+    doorClosed = false;
+    doorOpenMove = true;
+    doorCloseMove = false; 
+  }
+  else {                            // if top reed switch circuit is closed
+    stopCoopDoorMotorB();
+    doorOpen = true;
+    doorOpenMove = false;
+    doorCloseMove = false;
+  }
+}
+ 
+// Function to run the coop door
+void doCoopDoor() {
+  if (photocellReadingLevel  == '1') {              // if it's dark
+    readSwitches();
+    closeCoopDoorMotorB();                      // close the door
+  } 
+  else if (photocellReadingLevel  == '3') {              // if it's light
+    readSwitches();
+    openCoopDoorMotorB();                       // Open the door
+  } 
+  else if (photocellReadingLevel == '2') {          // if it's twilight
+    readSwitches();
+    stopCoopDoorMotorB();
+  }
+}
+ 
+// Door Override Open
+BLYNK_WRITE (V7)
+{
+  photocellReadingLevel = '3';
+}
+ 
+// Door Override Closed
+BLYNK_WRITE (V6)
+{
+  photocellReadingLevel = '1';
+}
+ 
+// Door in Auto or Manual Mode
+BLYNK_WRITE (V10)
+{
+  if (param.asInt() == 0) {
+    doorSensor = false;
+  }
+  else {
+    doorSensor = true;
+  }
+}
+ 
+// LayLight On or Off
+BLYNK_WRITE (V11) 
+{
+  if (param.asInt() == 0) {
+    layLightOn = false;
+    nightTimer = false;
+    digitalWrite(layLightRelay, LOW); // turn off the lay light
+  }
+  else {
+    layLightOn = true;
+  }
+}
+ 
+// Turn on the Night Light
+BLYNK_WRITE (V12) 
+{
+  nightLightOn = true;
+} 
+
+// Adjust Ventilation Fan Temperature
+BLYNK_WRITE (V17)
+{
+  hotTemp = param.asInt();
+}
+
+// Adjust Water Heater Temp
+BLYNK_WRITE (V18) 
+{
+  coldTemp = param.asInt();
+}
+
+// Adjust Door Close Light Level
+BLYNK_WRITE (V19) 
+{
+  closeDoor = param.asInt();
+  openDoor = closeDoor + 20;
+}
+
+
+ 
+ 
+ 
+// Run the code 
+void loop() {
+  BlynkEdgent.run();
+  timer.run();
+  doCoopDoor();
+}
