@@ -1,6 +1,6 @@
 # CoopCommandESP32
 Next generation Coop Command using an ESP32 as the MCU
-# This is the next generation of the original, ATMEGA328P based CoopCommand found here: https://github.com/hms-11/CoopCommand
+## This is the next generation of the original, ATMEGA328P based CoopCommand found here: https://github.com/hms-11/CoopCommand
 
 Chickens are simple animals with lots of benefits. The downside? Humans are not the only creatures that find chickens tasty and chickens themselves require some basic maintenance and care to keep happy and healthy. 
 
