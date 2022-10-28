@@ -38,7 +38,7 @@ You can also support this project through "Buy me a Coffee":
 
 - Efficient SMPS for off-grid operation @ 12-24V DC.
 
-- TI DRV8871 Motor Driver IC w/3.6A current cabilitity & voltages up to maximimum working voltage of CoopCommand.
+- TI DRV8870 Motor Driver IC w/3.6A current cabilitity & voltages up to maximimum working voltage of CoopCommand.
 
 - LayLight MOSFET for controlling LED lights for supplementing daylight hours to keep chickens laying even with less than 14 hours of Daylight.
 
