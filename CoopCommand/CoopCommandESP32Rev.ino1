@@ -11,8 +11,8 @@
 
 
 // Fill-in information from your Blynk Template here
-#define BLYNK_TEMPLATE_ID "TMPL-flCABCq"
-#define BLYNK_DEVICE_NAME "CoopCommand"
+#define BLYNK_TEMPLATE_ID ""
+#define BLYNK_DEVICE_NAME ""
  
 #define BLYNK_FIRMWARE_VERSION        "0.4.1"
  
