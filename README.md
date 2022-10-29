@@ -28,7 +28,7 @@ You can also support this project @
 
 - Ease of installation and configuration for non-technical individuals. 
 
-- Designed for Off Grid Operation (12-24v DC), can also be powered by a suitably sized 12V Power Supply from an AC source.
+- Designed for Off Grid Operation (12-24v DC), can also be powered by a suitably sized 12-24V DC Power Supply from an AC source.
 
 
 
