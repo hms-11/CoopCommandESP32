@@ -60,6 +60,13 @@ You can also support this project through "Buy me a Coffee":
 
 - Adjust settings for all coop operations.
 
+# THE BOARD:
+
+CoopCommand uses the TacoChicken control board. Currently the board is on Rev1. The board is 100% Open Source and all files can be found [HERE](https://oshwlab.com/coreyearl1985/tacochickenrev1-dc_copy)
+
+If you want to purchase the pre-assembled board, I have them for sale [HERE](https://www.tindie.com/products/hms-11/taco-chicken-esp32-based-control-board/)
+
+
 # Getting Started:
 
 All files are included in this git-repository to get CoopCommand up and running. To get started, use the Gerber files and BOM to get the PCB's coming. The pic n place files can be used if your board house supports assembly. These boards were designed to use JLCPCB's assembly service. 
