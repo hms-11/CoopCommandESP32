@@ -2,7 +2,7 @@
 
 Next generation Coop Command using an ESP32 as the MCU
 
-## This is the next generation of the original, ATMEGA328P based CoopCommand found here: https://github.com/hms-11/CoopCommand
+#### This is the next generation of the original, ATMEGA328P based CoopCommand found [HERE](https://github.com/hms-11/CoopCommand).
 
 # Overview
 
