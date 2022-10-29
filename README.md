@@ -1,6 +1,10 @@
 # CoopCommandESP32
+
 Next generation Coop Command using an ESP32 as the MCU
+
 ## This is the next generation of the original, ATMEGA328P based CoopCommand found here: https://github.com/hms-11/CoopCommand
+
+# Overview
 
 Chickens are simple animals with lots of benefits. The downside? Humans are not the only creatures that find chickens tasty and chickens themselves require some basic maintenance and care to keep happy and healthy. 
 
@@ -14,11 +18,18 @@ You can also support this project @
 
 # GOALS:
 
+- Allow Backyard Chicken owners the ability to increase the security and productivity of their flock while reducing the daily labour costs of chicken ownership. 
+
+- Automatic Coop Door controlled by daylight in order to more closely track chicken behaviour. 
+
+- Monitor and control coop and water temperatures to prevent overheating of the coop and freezing of the water.
+
+- "LayLight" which monitors daylight light levels and ensures chickens receive at least 14 hours of daylight to maintain laying throughout winter months.
+
 - Ease of installation and configuration for non-technical individuals. 
 
-- Multiple Power Options (wall wart mains power or 12-24V off-grid solar/wind/battery systems).
+- Designed for Off Grid Operation (12-24v DC), can also be powered by a suitably sized 12V Power Supply from an AC source.
 
-- Wi-Fi connectivity for remote monitoring and overriding of coop door.
 
 
 # FEATURES:
