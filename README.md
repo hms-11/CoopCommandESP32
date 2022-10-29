@@ -26,15 +26,15 @@ You can also support this project through "Buy me a Coffee":
 
 ## TACO CHICKEN COOP COMMAND MAIN BOARD:
 
-- Hardware debouncing on door limit switches.
+- Hardware debouncing on door limit switches. [Example Limit Switches](https://www.amazon.ca/SpeedDa-Magnetic-Switch-Normally-Security/dp/B076GZDYD2/ref=sr_1_11?crid=1FTS5IZLOU1AM&keywords=magnetic+door+switch&qid=1667011161&qu=eyJxc2MiOiI0LjYxIiwicXNhIjoiNC4xMSIsInFzcCI6IjMuODAifQ%3D%3D&sprefix=magnetic+door+swi%2Caps%2C431&sr=8-11)
 
 - Pluggable Terminal Block connectors for all user-installed inputs/outputs.
 
-- DHT22 Input (requires 10k pullup on DHT22) for interior coop temperature.
+- DHT22 Input (requires 10k pullup on DHT22) for interior coop temperature. [Example DHT22](https://universal-solder.ca/product/dht22-temperature-humidity-sensor-16bit-digital-interface/)
 
-- DS18B20 Input (Pullup resistor already on board) for water temperature.
+- DS18B20 Input (Pullup resistor already on board TACO CHICKEN board) for water temperature. [Example DS18B20](https://universal-solder.ca/product/digital-temperature-sensor-ds18b20-watertight-1-wire-interface-3-meter-wire/)
 
-- GL5539 Photoresistor Input (requires GL5539 with 10K resistor as voltage divider) for daylight sensor.
+- GL5539 Photoresistor Input (requires GL5539 with 10K resistor as voltage divider) for daylight sensor. [Example GL5539](https://universal-solder.ca/product/50-pcs-photo-resistor-5-different-types-10-each-gl55xx-series/)
 
 - Efficient SMPS for off-grid operation @ 12-24V DC.
 
@@ -42,11 +42,11 @@ You can also support this project through "Buy me a Coffee":
 
 - LayLight MOSFET for controlling LED lights for supplementing daylight hours to keep chickens laying even with less than 14 hours of Daylight.
 
-- Ventilation Fan MOSFET for controlling a fan for cooling the coop in the summer.
+- Ventilation Fan MOSFET for controlling a fan for cooling the coop in the summer. [Example Ventilation Fan](https://www.amazon.ca/MACHSWON-Cooling-Exhaust-Ventilation-Motorhome/dp/B08FMNZH5T/ref=sr_1_8?keywords=12v+ventilation+fan&qid=1667011330&qu=eyJxc2MiOiIzLjM1IiwicXNhIjoiMi4wMCIsInFzcCI6IjAuMDAifQ%3D%3D&sprefix=12v+ventilat%2Caps%2C151&sr=8-8)
 
-- Water Heat MOSFET for controlling a heater for heating the water in the winter. 
+- Water Heat MOSFET for controlling a heater for heating the water in the winter. [Example Water Heater](https://www.amazon.ca/Dernord-Immersion-Submersible-Element-Stainless/dp/B0761L2Q8M/ref=sr_1_25?crid=V2QPTYX224KK&keywords=12v+water+heater&qid=1667011500&qu=eyJxc2MiOiI1LjIwIiwicXNhIjoiNC42NiIsInFzcCI6IjIuNTIifQ%3D%3D&sprefix=12v+water+heate%2Caps%2C149&sr=8-25)
 
-- USB-UART CH340 chip wirth auto-reset for ease of programming (just plug in a USB cable and go!)
+- USB-UART CH340 chip wirth auto-reset for ease of programming (just plug in a [USB A - USB A cable](https://www.amazon.ca/DTECH-Type-Cable-Speed-Black/dp/B079GV2F5W/ref=sr_1_12?crid=FD392ACYKISH&keywords=usb+a+usb+a&qid=1667011638&qu=eyJxc2MiOiIyLjI1IiwicXNhIjoiMi4wMCIsInFzcCI6IjEuNTgifQ%3D%3D&refinements=p_n_availability%3A12035748011&sprefix=usb+a+usb+a%2Caps%2C162&sr=8-12) and go!)
 
 
 
@@ -69,13 +69,13 @@ If you want to purchase the pre-assembled board, I have them for sale [HERE](htt
 
 # Getting Started:
 
-All files are included in this git-repository to get CoopCommand up and running. To get started, use the Gerber files and BOM to get the PCB's coming. The pic n place files can be used if your board house supports assembly. These boards were designed to use JLCPCB's assembly service. 
+All files are included in this git-repository to get CoopCommand up and running. To get started, either create/modify your own based on this [OPEN SOURCE](https://oshwlab.com/coreyearl1985/tacochickenrev1-dc_copy) board or buy the board [HERE](https://www.tindie.com/products/hms-11/taco-chicken-esp32-based-control-board/).
 
-Once you have the board in hand and assembled, program can be easily loaded in using the Arduino IDE (or your preffered IDE) and a USB cable.
+Once you have the board in hand and assembled, program can be easily loaded in using the Arduino IDE (or your preffered IDE) and a USB A - USB A cable.
 
-First, follow the instructions in the "BlynkInfo" file. This will setup the needed steps to get the app going and generate a required Template ID and Device Name to be added to your program to be uploaded to the board.
+First, follow the instructions in the [BlynkInfo](https://github.com/hms-11/CoopCommandESP32/blob/main/BlynkInfo) file. This will setup the needed steps to get the app going and generate a required Template ID and Device Name to be added to your program to be uploaded to the board.
 
-Secondly, download all files using the "Download Zip" button. Extract all files in the CoopCommand folder into a folder all together. If you open the .ino file using Arduino IDE all other files will be loaded at same time. Insert the Template ID and Device Name into the appropriate location at the top of the sketch.  Select your board (ESP32 Dev Module), select your Com Port and upload!
+Secondly, download all code files [HERE](https://github.com/hms-11/CoopCommandESP32/archive/refs/heads/main.zip). Extract all files in the CoopCommand folder into a folder all together. If you open the .ino file using Arduino IDE all other files will be loaded at same time. Insert the Template ID and Device Name into the appropriate location at the top of the sketch.  Select your board (ESP32 Dev Module), select your Com Port and click upload!
 
  
 
