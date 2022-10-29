@@ -10,7 +10,7 @@ Chickens are simple animals with lots of benefits. The downside? Humans are not 
 
 CoopCommand aims to reduce the daily labour of looking after chickens, improve their well-being as well as allow hobby-farmers the ability to go out for the night without worrying if their chickens are in danger from wandering predators. 
 
-[![CoopCommand Picture]https://github.com/hms-11/CoopCommandESP32/blob/main/CoopCommandImages/PXL_20221015_171228559.jpg)](https://github.com)
+[![CoopCommand Picture](https://github.com/hms-11/CoopCommandESP32/blob/main/CoopCommandImages/PXL_20221015_171228559.jpg)](https://github.com)
 
 Contributors always welcome, I could use people smarter than myself to keep improving this project. 
 
