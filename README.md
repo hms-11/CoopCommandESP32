@@ -99,3 +99,7 @@ Secondly, download all code files [HERE](https://github.com/hms-11/CoopCommandES
 
 - Loss of wifi can result in the system getting stuck in a blocked loop, resulting in no Coop control operations happening until wifi is restored.   
 
+# THANKS
+
+There is an incredible reddit community dedicated to reviewing PCB schematics and layouts. This project, and many others of mine would not be possible without the amazing individuals present in this community. The subreddit is https://www.reddit.com/r/PrintedCircuitBoard/ .
+
