@@ -98,6 +98,7 @@ Secondly, download all code files [HERE](https://github.com/hms-11/CoopCommandES
 # CURRENT KNOWN ISSUES:
 
 - Loss of wifi can result in the system getting stuck in a blocked loop, resulting in no Coop control operations happening until wifi is restored.   
+- Auto/Manual door function does not appear to switch correctly. System is stuck in auto mode. 
 
 # THANKS
 
