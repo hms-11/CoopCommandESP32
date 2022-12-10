@@ -14,7 +14,7 @@
 #define BLYNK_TEMPLATE_ID ""
 #define BLYNK_DEVICE_NAME ""
  
-#define BLYNK_FIRMWARE_VERSION        "0.4.1"
+#define BLYNK_FIRMWARE_VERSION        "0.5.9"
  
 #define BLYNK_PRINT Serial
 //#define BLYNK_DEBUG
@@ -60,6 +60,10 @@ DHT dht(DHTPIN, DHTTYPE);     // Initialize DHT sensor
 
 const int photocellPin                 = 34;  // analog pin for photocell
 
+// Battery Voltage Monitor Pin
+
+const int batteryPin                   = 36;  // analog pin for battery voltage monitor
+
 // Door Limit Switches
 
 const int bottomSwitchPin              = 26;  // bottom switch is connected to pin 26
@@ -74,7 +78,7 @@ const int directionOpenCoopDoorMotorB  = 21;  // direction open motor b - pin 21
 const int layLightRelay                = 4;   // output pin controlling lay light MOSFET
 const int fanRelay                     = 16;  // output pin controlling ventilation fan MOSFET
 const int heatRelay                    = 17;  // output pin controlling water heater MOSFET
-const int output3                      = 18;  // Spare Output MOSFET
+const int output4                      = 18;  // Spare Output MOSFET
 
  
 // Sensor Variables
@@ -99,7 +103,9 @@ float hum;                               // Stores humidity value from DHT22
 float temp;                              // Stores temperature value from DHT22
 int photocellReading;                    // analog reading of the photocell
 int photocellReadingLevel = '2';         // photocell reading levels (night, light, twilight)
- 
+int batteryVoltage;                      // battery voltage reading mapped 0-100%
+int batteryVoltageRaw;                   // raw battery voltage reading
+
 // Timer Variables
 unsigned long layLightTimer            = 36000000; // Timer to make sure at least 14 hours of "daylight"
 unsigned long lastDayLightReadingTime  = 0;        // timer to keep track of how long it has been night
@@ -116,6 +122,7 @@ void setup()
   
   // Set Pin Modes
   pinMode(photocellPin, INPUT);
+  pinMode(batteryPin, INPUT);
   pinMode(topSwitchPin, INPUT);
   pinMode(bottomSwitchPin, INPUT);
   pinMode(layLightRelay, OUTPUT);
@@ -132,7 +139,7 @@ void setup()
   digitalWrite(layLightRelay, LOW);
   digitalWrite(fanRelay, LOW);
   digitalWrite(heatRelay, LOW);
-  digitalWrite(output3, LOW);
+  digitalWrite(output4, LOW);
   readSwitches();
 
   // Set Timers
@@ -177,6 +184,14 @@ void readSensor()
 {
   // Send Light Value to Blynk
   Blynk.virtualWrite(V8, photocellReading);
+  
+  // Read the battery voltage and send to Blynk
+
+  batteryVoltageRaw = analogRead(batteryPin);
+  Blynk.virtualWrite(V23, batteryVoltageRaw);
+  batteryVoltage = map(batteryVoltageRaw, 3405, 3735, 0, 100); // Map reading to 0-100
+  Blynk.virtualWrite(V9, batteryVoltage);
+
   // Read DS18B20 Water Temp Sensor
   sensors.requestTemperatures(); 
   waterTemp = sensors.getTempCByIndex(0);
@@ -248,17 +263,15 @@ void doorControl()
   else if (photocellReading  >= closeDoor && photocellReading <= openDoor) { // Twighlight setting
     if (doorSensor) {
       photocellReadingLevel = '2';
+      nightTimer = false;
     }
   } 
   else if (photocellReading  >= openDoor) { //Daylight Setting
     // If "daytime", set coop door control to open
     if (doorSensor) {
       photocellReadingLevel = '3';
+      nightTimer = false;
     }
-  }
-  else if (photocellReading >= closeDoor) {
-    // Turn off night timer and Lay Light once it is not pitch black
-    nightTimer = false;
   }
 }
  
