@@ -99,29 +99,37 @@ static bool config_load_blnkopt()
 }
 
 #include <Preferences.h>
-Preferences preferences;
 
 void config_load()
 {
-  memset(&configStore, 0, sizeof(configStore));
-  preferences.getBytes("config", &configStore, sizeof(configStore));
-  if (configStore.magic != configDefault.magic) {
-    DEBUG_PRINT("Using default config.");
-    configStore = configDefault;
-    return;
+  Preferences prefs;
+  if (prefs.begin("blynk", true)) { // read-only
+    memset(&configStore, 0, sizeof(configStore));
+    prefs.getBytes("config", &configStore, sizeof(configStore));
+    if (configStore.magic != configDefault.magic) {
+      DEBUG_PRINT("Using default config.");
+      configStore = configDefault;
+    }
+  } else {
+    DEBUG_PRINT("Config read failed");
   }
 }
 
 bool config_save()
 {
-  preferences.putBytes("config", &configStore, sizeof(configStore));
-  DEBUG_PRINT("Configuration stored to flash");
-  return true;
+  Preferences prefs;
+  if (prefs.begin("blynk", false)) { // writeable
+    prefs.putBytes("config", &configStore, sizeof(configStore));
+    DEBUG_PRINT("Configuration stored to flash");
+    return true;
+  } else {
+    DEBUG_PRINT("Config write failed");
+    return false;
+  }
 }
 
 bool config_init()
 {
-  preferences.begin("blynk", false);
   config_load();
   return true;
 }
@@ -131,7 +139,6 @@ void enterResetConfig()
   DEBUG_PRINT("Resetting configuration!");
   configStore = configDefault;
   config_save();
-  eraseMcuConfig();
   BlynkState::set(MODE_WAIT_CONFIG);
 }
 

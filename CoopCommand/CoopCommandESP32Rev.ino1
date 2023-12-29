@@ -7,14 +7,14 @@
 //                          -- Water Temp Sensor DS18B20
 //                          -- WIFI Monitored and Controlled via Blynk App
 //                          -- Designed to be used with TacoChicken Control Boards (V1.0)
-
-
-
-// Fill-in information from your Blynk Template here
-#define BLYNK_TEMPLATE_ID ""
-#define BLYNK_DEVICE_NAME ""
  
-#define BLYNK_FIRMWARE_VERSION        "0.5.9"
+ 
+ 
+// Fill-in information from your Blynk Template here
+#define BLYNK_TEMPLATE_ID "TMPL-flCABCq"
+#define BLYNK_TEMPLATE_NAME "CoopCommand"
+ 
+#define BLYNK_FIRMWARE_VERSION        "0.6.1"
  
 #define BLYNK_PRINT Serial
 //#define BLYNK_DEBUG
@@ -25,7 +25,7 @@
 //#define USE_WROVER_BOARD
 //#define USE_TTGO_T7
  
-
+ 
 // Libraries
 #include "BlynkEdgent.h"
 #include <DallasTemperature.h>
@@ -41,7 +41,7 @@ WidgetLED led4(V4);
 WidgetLED led5(V14);
  
 // Blynk Timer
-
+ 
 BlynkTimer timer; 
  
 // DS18B20 Sensor Setup
@@ -51,35 +51,35 @@ OneWire oneWire(ONE_WIRE_BUS);          // Initialize One-Wire Bus
 DallasTemperature sensors(&oneWire);    // Initialize DS18B20
  
 //DHT Setup
-
+ 
 #define DHTPIN 32             // Pin for DHT sensor
 #define DHTTYPE DHT22         // DHT 22  (AM2302)
 DHT dht(DHTPIN, DHTTYPE);     // Initialize DHT sensor
  
 // Photocell Pin
-
+ 
 const int photocellPin                 = 34;  // analog pin for photocell
-
+ 
 // Battery Voltage Monitor Pin
-
+ 
 const int batteryPin                   = 36;  // analog pin for battery voltage monitor
-
+ 
 // Door Limit Switches
-
+ 
 const int bottomSwitchPin              = 26;  // bottom switch is connected to pin 26
 const int topSwitchPin                 = 27;  // top switch is connected to pin 27
-
+ 
 //Door Motor Driver Pins
-
-const int directionCloseCoopDoorMotorB = 19;  // direction close motor b - pin 19
-const int directionOpenCoopDoorMotorB  = 21;  // direction open motor b - pin 21
-
+ 
+const int directionCloseCoopDoorMotorB = 22;  // direction close motor b - pin 22
+const int directionOpenCoopDoorMotorB  = 23;  // direction open motor b - pin 23
+ 
 // OutPuts
 const int layLightRelay                = 4;   // output pin controlling lay light MOSFET
 const int fanRelay                     = 16;  // output pin controlling ventilation fan MOSFET
 const int heatRelay                    = 17;  // output pin controlling water heater MOSFET
 const int output4                      = 18;  // Spare Output MOSFET
-
+ 
  
 // Sensor Variables
 bool doorOpen          = false;          // is the coop door open
@@ -103,9 +103,10 @@ float hum;                               // Stores humidity value from DHT22
 float temp;                              // Stores temperature value from DHT22
 int photocellReading;                    // analog reading of the photocell
 int photocellReadingLevel = '2';         // photocell reading levels (night, light, twilight)
-int batteryVoltage;                      // battery voltage reading mapped 0-100%
+float batteryVoltage;                      // battery voltage reading mapped 0-100%
 int batteryVoltageRaw;                   // raw battery voltage reading
-
+int batteryPercent;
+ 
 // Timer Variables
 unsigned long layLightTimer            = 36000000; // Timer to make sure at least 14 hours of "daylight"
 unsigned long lastDayLightReadingTime  = 0;        // timer to keep track of how long it has been night
@@ -119,7 +120,7 @@ void setup()
   dht.begin(); // Start DHT sensor
   sensors.begin(); // Start DS18B20 Sensor
   BlynkEdgent.begin(); // Start Edgent
-  
+ 
   // Set Pin Modes
   pinMode(photocellPin, INPUT);
   pinMode(batteryPin, INPUT);
@@ -130,18 +131,18 @@ void setup()
   pinMode(heatRelay, OUTPUT);
   pinMode(directionCloseCoopDoorMotorB, OUTPUT);
   pinMode(directionOpenCoopDoorMotorB, OUTPUT);
-  
+ 
   // Initial Photocell reading
   photocellReading = analogRead(photocellPin);
   photocellReading = map(photocellReading, 0, 4000, 0, 100); // Map reading to 0-100
-
+ 
   // Ensure Mosfets are pulled low
   digitalWrite(layLightRelay, LOW);
   digitalWrite(fanRelay, LOW);
   digitalWrite(heatRelay, LOW);
   digitalWrite(output4, LOW);
   readSwitches();
-
+ 
   // Set Timers
   timer.setInterval(2000,readSensor);
   timer.setInterval(600000,doorControl);
@@ -184,14 +185,17 @@ void readSensor()
 {
   // Send Light Value to Blynk
   Blynk.virtualWrite(V8, photocellReading);
-  
+ 
   // Read the battery voltage and send to Blynk
-
+ 
   batteryVoltageRaw = analogRead(batteryPin);
   Blynk.virtualWrite(V23, batteryVoltageRaw);
-  batteryVoltage = map(batteryVoltageRaw, 3405, 3735, 0, 100); // Map reading to 0-100
+  batteryVoltage = (batteryVoltageRaw * 0.003241); // Map reading to 12v reference
+  batteryPercent = map(batteryVoltageRaw, 3708, 3920, 0, 100); // Map reading to 0-100
+ 
   Blynk.virtualWrite(V9, batteryVoltage);
-
+  Blynk.virtualWrite(V24, batteryPercent);
+ 
   // Read DS18B20 Water Temp Sensor
   sensors.requestTemperatures(); 
   waterTemp = sensors.getTempCByIndex(0);
@@ -299,7 +303,7 @@ void waterHeat()
     digitalWrite(heatRelay, LOW); // Turn off the water heater
     Blynk.virtualWrite(V15, LOW); // Turn off the Blynk LED
   }
-
+ 
 }
  
 // Function to control ventilation fan
@@ -426,27 +430,27 @@ BLYNK_WRITE (V12)
 {
   nightLightOn = true;
 } 
-
+ 
 // Adjust Ventilation Fan Temperature
 BLYNK_WRITE (V17)
 {
   hotTemp = param.asInt();
 }
-
+ 
 // Adjust Water Heater Temp
 BLYNK_WRITE (V18) 
 {
   coldTemp = param.asInt();
 }
-
+ 
 // Adjust Door Close Light Level
 BLYNK_WRITE (V19) 
 {
   closeDoor = param.asInt();
   openDoor = closeDoor + 20;
 }
-
-
+ 
+ 
  
  
  

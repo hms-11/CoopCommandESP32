@@ -4,16 +4,8 @@
 #include <DNSServer.h>
 #include <Update.h>
 
-#include <nvs.h>
-#include <nvs_flash.h>
+#ifndef BLYNK_FS
 
-WebServer server(80);
-DNSServer dnsServer;
-const byte DNS_PORT = 53;
-
-#ifdef BLYNK_USE_SPIFFS
-  #include "SPIFFS.h"
-#else
   const char* config_form = R"html(
 <!DOCTYPE HTML>
 <html>
@@ -62,7 +54,15 @@ const byte DNS_PORT = 53;
 </body>
 </html>
 )html";
+
 #endif
+
+WebServer server(80);
+DNSServer dnsServer;
+const byte DNS_PORT = 53;
+
+static int connectNetRetries    = WIFI_CLOUD_MAX_RETRIES;
+static int connectBlynkRetries  = WIFI_CLOUD_MAX_RETRIES;
 
 static const char serverUpdateForm[] PROGMEM =
   R"(<html><body>
@@ -77,46 +77,100 @@ void restartMCU() {
   while(1) {};
 }
 
-void eraseMcuConfig() {
-  // Erase ESP32 NVS
-  int err;
-  //err=nvs_flash_init();
-  //BLYNK_LOG2("nvs_flash_init: ", err ? String(err) : "Success");
-  err=nvs_flash_erase();
-  BLYNK_LOG2("nvs_flash_erase: ", err ? String(err) : "Success");
+static
+String encodeUniquePart(uint32_t n, unsigned len)
+{
+  static constexpr char alphabet[] = { "0W8N4Y1HP5DF9K6JM3C2UA7R" };
+  static constexpr int base = sizeof(alphabet)-1;
+
+  char buf[16] = { 0, };
+  char prev = 0;
+  for (unsigned i = 0; i < len; n /= base) {
+    char c = alphabet[n % base];
+    if (c == prev) {
+      c = alphabet[(n+1) % base];
+    }
+    prev = buf[i++] = c;
+  }
+  return String(buf);
 }
 
-void getWiFiName(char* buff, size_t len, bool withPrefix = true) {
+static
+String getWiFiName(bool withPrefix = true)
+{
   const uint64_t chipId = ESP.getEfuseMac();
+
   uint32_t unique = 0;
   for (int i=0; i<4; i++) {
     unique = BlynkCRC32(&chipId, sizeof(chipId), unique);
   }
-  unique &= 0xFFFFF;
+  String devUnique = encodeUniquePart(unique, 4);
+
+  String devPrefix = CONFIG_DEVICE_PREFIX;
+  String devName = String(BLYNK_TEMPLATE_NAME).substring(0, 31-6-devPrefix.length());
 
   if (withPrefix) {
-    snprintf(buff, len, "Blynk %s-%05X", BLYNK_DEVICE_NAME, unique);
+    return devPrefix + " " + devName + "-" + devUnique;
   } else {
-    snprintf(buff, len, "%s-%05X", BLYNK_DEVICE_NAME, unique);
+    return devName + "-" + devUnique;
   }
+}
+
+static inline
+String macToString(byte mac[6]) {
+  char buff[20];
+  snprintf(buff, sizeof(buff), "%02x:%02x:%02x:%02x:%02x:%02x",
+           mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+  return String(buff);
+}
+
+static inline
+const char* wifiSecToStr(wifi_auth_mode_t t) {
+  switch (t) {
+    case WIFI_AUTH_OPEN:            return "OPEN";
+    case WIFI_AUTH_WEP:             return "WEP";
+    case WIFI_AUTH_WPA_PSK:         return "WPA";
+    case WIFI_AUTH_WPA2_PSK:        return "WPA2";
+    case WIFI_AUTH_WPA_WPA2_PSK:    return "WPA+WPA2";
+    case WIFI_AUTH_WPA2_ENTERPRISE: return "WPA2-EAP";
+#if (ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 3, 0))
+    case WIFI_AUTH_WPA3_PSK:        return "WPA3";
+    case WIFI_AUTH_WPA2_WPA3_PSK:   return "WPA2+WPA3";
+    case WIFI_AUTH_WAPI_PSK:        return "WAPI";
+#endif
+    default:                        return "unknown";
+  }
+}
+
+static
+String getWiFiMacAddress() {
+  return WiFi.macAddress();
+}
+
+static
+String getWiFiApBSSID() {
+  return WiFi.softAPmacAddress();
+}
+
+static
+String getWiFiNetworkSSID() {
+  return WiFi.SSID();
+}
+
+static
+String getWiFiNetworkBSSID() {
+  return WiFi.BSSIDstr();
 }
 
 void enterConfigMode()
 {
-  char ssidBuff[64];
-  getWiFiName(ssidBuff, sizeof(ssidBuff));
-
   WiFi.mode(WIFI_OFF);
   delay(100);
   WiFi.mode(WIFI_AP);
   delay(2000);
   WiFi.softAPConfig(WIFI_AP_IP, WIFI_AP_IP, WIFI_AP_Subnet);
-  WiFi.softAP(ssidBuff);
+  WiFi.softAP(getWiFiName().c_str());
   delay(500);
-
-  IPAddress myIP = WiFi.softAPIP();
-  DEBUG_PRINT(String("AP SSID: ") + ssidBuff);
-  DEBUG_PRINT(String("AP IP:   ") + myIP[0] + "." + myIP[1] + "." + myIP[2] + "." + myIP[3]);
 
   // Set up DNS Server
   dnsServer.setTTL(300); // Time-to-live 300s
@@ -149,25 +203,33 @@ void enterConfigMode()
       //WiFiUDP::stop();
 
       if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { //start with max available size
-        Update.printError(BLYNK_PRINT);
+        DEBUG_PRINT(Update.errorString());
       }
     } else if (upload.status == UPLOAD_FILE_WRITE) {
       /* flashing firmware to ESP*/
       if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
-        Update.printError(BLYNK_PRINT);
+        DEBUG_PRINT(Update.errorString());
       }
+#ifdef BLYNK_PRINT
       BLYNK_PRINT.print(".");
+#endif
     } else if (upload.status == UPLOAD_FILE_END) {
+#ifdef BLYNK_PRINT
       BLYNK_PRINT.println();
+#endif
       DEBUG_PRINT("Finishing...");
       if (Update.end(true)) { //true to set the size to the current progress
         DEBUG_PRINT("Update Success. Rebooting");
       } else {
-        Update.printError(BLYNK_PRINT);
+        DEBUG_PRINT(Update.errorString());
       }
     }
   });
-
+#ifndef BLYNK_FS
+  server.on("/", []() {
+    server.send(200, "text/html", config_form);
+  });
+#endif
   server.on("/config", []() {
     DEBUG_PRINT("Applying configuration...");
     String ssid = server.arg("ssid");
@@ -186,7 +248,7 @@ void enterConfigMode()
     String dns  = server.arg("dns");
     String dns2 = server.arg("dns2");
 
-    bool save  = server.arg("save").toInt();
+    bool forceSave  = server.arg("save").toInt();
 
     String content;
 
@@ -194,7 +256,7 @@ void enterConfigMode()
     DEBUG_PRINT(String("Blynk cloud: ") + token + " @ " + host + ":" + port);
 
     if (token.length() == 32 && ssid.length() > 0) {
-      configStore.setFlag(CONFIG_FLAG_VALID, false);
+      configStore = configDefault;
       CopyString(ssid, configStore.wifiSSID);
       CopyString(pass, configStore.wifiPass);
       CopyString(token, configStore.cloudToken);
@@ -206,7 +268,7 @@ void enterConfigMode()
       }
 
       IPAddress addr;
-      
+
       if (ip.length() && addr.fromString(ip)) {
         configStore.staticIP = addr;
         configStore.setFlag(CONFIG_FLAG_STATIC_IP, true);
@@ -226,7 +288,7 @@ void enterConfigMode()
         configStore.staticDNS2 = addr;
       }
 
-      if (save) {
+      if (forceSave) {
         configStore.setFlag(CONFIG_FLAG_VALID, true);
         config_save();
 
@@ -236,6 +298,7 @@ void enterConfigMode()
       }
       server.send(200, "application/json", content);
 
+      connectNetRetries = connectBlynkRetries = 1;
       BlynkState::set(MODE_SWITCH_TO_STA);
     } else {
       DEBUG_PRINT("Configuration invalid");
@@ -244,19 +307,22 @@ void enterConfigMode()
     }
   });
   server.on("/board_info.json", []() {
+    // Configuring starts with board info request (may impact indication)
+    BlynkState::set(MODE_CONFIGURING);
+
     DEBUG_PRINT("Sending board info...");
     const char* tmpl = BLYNK_TEMPLATE_ID;
-    char ssidBuff[64];
-    getWiFiName(ssidBuff, sizeof(ssidBuff));
+
     char buff[512];
     snprintf(buff, sizeof(buff),
-      R"json({"board":"%s","tmpl_id":"%s","fw_type":"%s","fw_ver":"%s","ssid":"%s","bssid":"%s","last_error":%d,"wifi_scan":true,"static_ip":true})json",
-      BLYNK_DEVICE_NAME,
+      R"json({"board":"%s","tmpl_id":"%s","fw_type":"%s","fw_ver":"%s","ssid":"%s","bssid":"%s","mac":"%s","last_error":%d,"wifi_scan":true,"static_ip":true})json",
+      BLYNK_TEMPLATE_NAME,
       tmpl ? tmpl : "Unknown",
       BLYNK_FIRMWARE_TYPE,
       BLYNK_FIRMWARE_VERSION,
-      ssidBuff,
-      WiFi.softAPmacAddress().c_str(),
+      getWiFiName().c_str(),
+      getWiFiApBSSID().c_str(),
+      getWiFiMacAddress().c_str(),
       configStore.last_error
     );
     server.send(200, "application/json", buff);
@@ -296,28 +362,19 @@ void enterConfigMode()
       for (int i = 0; i < wifi_nets; i++){
         int id = indices[i];
 
-        const char* sec;
-        switch (WiFi.encryptionType(id)) {
-        case WIFI_AUTH_WEP:          sec = "WEP"; break;
-        case WIFI_AUTH_WPA_PSK:      sec = "WPA/PSK"; break;
-        case WIFI_AUTH_WPA2_PSK:     sec = "WPA2/PSK"; break;
-        case WIFI_AUTH_WPA_WPA2_PSK: sec = "WPA/WPA2/PSK"; break;
-        case WIFI_AUTH_OPEN:         sec = "OPEN"; break;
-        default:                     sec = "unknown"; break;
-        }
-
         snprintf(buff, sizeof(buff),
           R"json(  {"ssid":"%s","bssid":"%s","rssi":%i,"sec":"%s","ch":%i})json",
           WiFi.SSID(id).c_str(),
           WiFi.BSSIDstr(id).c_str(),
           WiFi.RSSI(id),
-          sec,
+          wifiSecToStr(WiFi.encryptionType(id)),
           WiFi.channel(id)
         );
 
         result += buff;
         if (i != wifi_nets-1) result += ",\n";
       }
+      WiFi.scanDelete();
       server.send(200, "application/json", result + "\n]");
     } else {
       server.send(200, "application/json", "[]");
@@ -331,14 +388,10 @@ void enterConfigMode()
     restartMCU();
   });
 
-#ifdef BLYNK_USE_SPIFFS
-  if (SPIFFS.begin()) {
-    server.serveStatic("/img/favicon.png", SPIFFS, "/img/favicon.png");
-    server.serveStatic("/img/logo.png", SPIFFS, "/img/logo.png");
-    server.serveStatic("/", SPIFFS, "/index.html");
-  } else {
-    DEBUG_PRINT("Webpage: No SPIFFS");
-  }
+#ifdef BLYNK_FS
+  server.serveStatic("/img/favicon.png", BLYNK_FS, "/img/favicon.png");
+  server.serveStatic("/img/logo.png", BLYNK_FS, "/img/logo.png");
+  server.serveStatic("/", BLYNK_FS, "/index.html");
 #endif
 
   server.begin();
@@ -348,27 +401,22 @@ void enterConfigMode()
     dnsServer.processNextRequest();
     server.handleClient();
     app_loop();
-    if (BlynkState::is(MODE_WAIT_CONFIG) && WiFi.softAPgetStationNum() > 0) {
-      BlynkState::set(MODE_CONFIGURING);
-    } else if (BlynkState::is(MODE_CONFIGURING) && WiFi.softAPgetStationNum() == 0) {
+    if (BlynkState::is(MODE_CONFIGURING) && WiFi.softAPgetStationNum() == 0) {
       BlynkState::set(MODE_WAIT_CONFIG);
     }
   }
 
   server.stop();
-  
-#ifdef BLYNK_USE_SPIFFS
-  SPIFFS.end();
-#endif
 }
 
 void enterConnectNet() {
   BlynkState::set(MODE_CONNECTING_NET);
   DEBUG_PRINT(String("Connecting to WiFi: ") + configStore.wifiSSID);
 
-  char ssidBuff[64];
-  getWiFiName(ssidBuff, sizeof(ssidBuff));
-  String hostname(ssidBuff);
+  // Needed for setHostname to work
+  WiFi.enableSTA(false);
+
+  String hostname = getWiFiName();
   hostname.replace(" ", "-");
   WiFi.setHostname(hostname.c_str());
 
@@ -408,8 +456,9 @@ void enterConnectNet() {
       BLYNK_LOG_IP("Using Dynamic IP: ", localip);
     }
 
+    connectNetRetries = WIFI_CLOUD_MAX_RETRIES;
     BlynkState::set(MODE_CONNECTING_CLOUD);
-  } else {
+  } else if (--connectNetRetries <= 0) {
     config_set_last_error(BLYNK_PROV_ERR_NETWORK);
     BlynkState::set(MODE_ERROR);
   }
@@ -423,6 +472,7 @@ void enterConnectCloud() {
 
   unsigned long timeoutMs = millis() + WIFI_CLOUD_CONNECT_TIMEOUT;
   while ((timeoutMs > millis()) &&
+        (WiFi.status() == WL_CONNECTED) &&
         (!Blynk.isTokenInvalid()) &&
         (Blynk.connected() == false))
   {
@@ -441,16 +491,21 @@ void enterConnectCloud() {
 
   if (Blynk.isTokenInvalid()) {
     config_set_last_error(BLYNK_PROV_ERR_TOKEN);
-    BlynkState::set(MODE_WAIT_CONFIG);
+    BlynkState::set(MODE_WAIT_CONFIG); // TODO: retry after timeout
+  } else if (WiFi.status() != WL_CONNECTED) {
+    BlynkState::set(MODE_CONNECTING_NET);
   } else if (Blynk.connected()) {
     BlynkState::set(MODE_RUNNING);
+    connectBlynkRetries = WIFI_CLOUD_MAX_RETRIES;
 
     if (!configStore.getFlag(CONFIG_FLAG_VALID)) {
       configStore.last_error = BLYNK_PROV_ERR_NONE;
       configStore.setFlag(CONFIG_FLAG_VALID, true);
       config_save();
+
+      Blynk.sendInternal("meta", "set", "Hotspot Name", getWiFiName());
     }
-  } else {
+  } else if (--connectBlynkRetries <= 0) {
     config_set_last_error(BLYNK_PROV_ERR_CLOUD);
     BlynkState::set(MODE_ERROR);
   }
@@ -471,7 +526,7 @@ void enterSwitchToSTA() {
 
 void enterError() {
   BlynkState::set(MODE_ERROR);
-  
+
   unsigned long timeoutMs = millis() + 10000;
   while (timeoutMs > millis() || g_buttonPressed)
   {
