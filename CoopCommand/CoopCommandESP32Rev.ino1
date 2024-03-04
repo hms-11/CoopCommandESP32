@@ -178,6 +178,7 @@ void layLight() {
   } 
 }
 
+// Function to send data to Blynk
 void blynkData()
 {
   
